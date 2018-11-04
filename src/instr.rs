@@ -27,17 +27,17 @@ fn simulated_sub(left: i32, right: i32) -> (i32, bool, bool) {
 /// Returns `true` if interrupted.
 pub fn exec(cpu: &mut Cpu) -> bool {
     let code = cpu.read_u16(cpu.reg(PC) as u32);
-    let bits = |size: usize, offset: usize| ((code >> offset) & ((1 << size) - 1));
+    let bits = |offset: usize, size: usize| ((code >> offset) & ((1 << size) - 1));
     let bit = |offset: usize| code & (1 << offset) != 0;
 
     match code >> 13 {
         0b000 => {
             let Rs = bits(3, 3);
-            let Rd = bits(3, 0);
-            let Op = bits(2, 11);
+            let Rd = bits(0, 3);
+            let Op = bits(11, 2);
 
             if Op == 0b11 { // Add/Subtract
-                let Offset3 = bits(3, 6);
+                let Offset3 = bits(6, 3);
                 let left = cpu.reg(Rs);
                 let right = if bit(10) { Offset3 } else { cpu.reg(Offset3) };
 
@@ -55,7 +55,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
             } else { // Move shifted register
 
                 let left = cpu.reg(Rs);
-                let Offset5 = bits(5, 6);
+                let Offset5 = bits(6, 5);
 
                 match Op {
                     0b00 => { // LSL Rd, Rs, #Offset5
@@ -108,9 +108,9 @@ pub fn exec(cpu: &mut Cpu) -> bool {
         }
 
         0b001 => { // move/compare/add/subtract immediate
-            let Op = bits(2, 11);
-            let Rd = bits(3, 8);
-            let right = bits(8, 0);
+            let Op = bits(11, 2);
+            let Rd = bits(8, 3);
+            let right = bits(0, 8);
 
             match Op {
                 0 => { // MOV Rd, #Offset8
@@ -146,9 +146,9 @@ pub fn exec(cpu: &mut Cpu) -> bool {
         }
         0b010 => {
             if bit(12) {
-                let Ro = bits(3, 6);
+                let Ro = bits(6, 3);
                 let Rb = bits(3, 3);
-                let Rd = bits(3, 0);
+                let Rd = bits(0, 3);
 
                 let address = (cpu.reg(Rb) + cpu.reg(Ro)) as u32;
 
@@ -196,8 +196,8 @@ pub fn exec(cpu: &mut Cpu) -> bool {
             } else if bit(11) { // PC-related load
                 // LDR Rd, [PC, #Imm]
 
-                let Rd = bits(4, 8);
-                let Word = bits(8, 0);
+                let Rd = bits(8, 4);
+                let Word = bits(0, 8);
 
                 let address = (((Word << 2) as i32) + ((cpu.reg(PC) + 4) & !2)) as u32;
                 let value = cpu.read_i32(address);
@@ -206,11 +206,11 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                 cpu.next_pc();
             } else if bit(10) { // HI register operations/branch exchange
 
-                let Op = bits(2, 8);
+                let Op = bits(8, 2);
                 let H1 = bit(7);
                 let H2 = bit(6);
                 let Rs = bits(3, 3) + if H2 { 8 } else { 0 };
-                let Rd = bits(3, 0) + if H1 { 8 } else { 0 };
+                let Rd = bits(0, 3) + if H1 { 8 } else { 0 };
 
                 match Op {
                     0 => { // ADD Rd, Hs ; ADD Hd, Rs ; ADD Hd, Hs
@@ -260,9 +260,9 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                     _ => unreachable!(),
                 }
             } else { // ALU operations
-                let Op = bits(4, 6);
+                let Op = bits(6, 4);
                 let Rs = bits(3, 3);
-                let Rd = bits(3, 0);
+                let Rd = bits(0, 3);
 
                 let left = cpu.reg(Rd);
                 let right = cpu.reg(Rs);
@@ -352,7 +352,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                             value,
                             Lvalue != (value as u32 as u64),
                             left > 0 && right > 0 && value < 0 ||
-                            left < 0 && right < 0 && value > 0
+                                left < 0 && right < 0 && value > 0,
                         );
                     }
                     6 => { // SBC Rd, Rs ; Rd := Rd - Rs - NOT C-bit
@@ -369,7 +369,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                             value,
                             Lvalue != (value as u32 as u64),
                             left > 0 && right > 0 && value < 0 ||
-                            left < 0 && right < 0 && value > 0
+                                left < 0 && right < 0 && value > 0,
                         );
                     }
                     7 => { // ROR Rd, Rs ; Rd := Rd ROR Rs
@@ -393,7 +393,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                         cpu.set_nzcv(
                             value,
                             Lvalue > 0xFFFFFFFFu64, // ???
-                            right & value < 0 // ???
+                            right & value < 0, // ???
                         )
                     }
                     10 => { // CMP Rd, Rs ; set condition codes on Rd - Rs
@@ -442,9 +442,9 @@ pub fn exec(cpu: &mut Cpu) -> bool {
             }
         }
         0b011 => { // Load/store with immediate offset
-            let Offset = bits(5, 6);
+            let Offset = bits(6, 5);
             let Rb = bits(3, 3);
-            let Rd = bits(3, 0);
+            let Rd = bits(0, 3);
 
             let address = (cpu.reg(Rb) + Offset) as u32;
 
@@ -471,8 +471,8 @@ pub fn exec(cpu: &mut Cpu) -> bool {
         }
         0b100 => {
             if bit(12) { // SP-relative load/store
-                let Rd = bits(3, 8);
-                let Word = bits(8, 0);
+                let Rd = bits(8, 3);
+                let Word = bits(0, 8);
 
                 let address = (cpu.reg(SP) + Word) as u32;
 
@@ -484,9 +484,9 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                     cpu.write_i32(adderss, value);
                 }
             } else { // Load/store halfword
-                let Offset = bits(5, 6);
+                let Offset = bits(6, 5);
                 let Rb = bits(3, 3);
-                let Rd = bits(3, 0);
+                let Rd = bits(0, 3);
 
                 let address = (cpu.reg(Rb) + Offset) as u32;
 
@@ -502,8 +502,8 @@ pub fn exec(cpu: &mut Cpu) -> bool {
             cpu.next_pc();
         }
         0b101 => if !bit(12) { // Load address
-            let Rd = bits(3, 8);
-            let Word = bits(8, 0);
+            let Rd = bits(8, 3);
+            let Word = bits(0, 8);
 
             let base = if bit(11) { // ADD Rd, SP, #Imm
                 cpu.reg(SP)
@@ -520,9 +520,9 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                 if bit(8) {
                     panic!();
                 } else {
-                    let Op = bits(2, 6);
+                    let Op = bits(6, 2);
                     let Rs = bits(3, 3);
-                    let Rd = bits(3, 0);
+                    let Rd = bits(0, 3);
 
                     let value = cpu.reg(Rs);
 
@@ -573,7 +573,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
             } else {
                 if bit(10) { // Push/pop registers
                     let R = bit(8);
-                    let Rlist = bits(8, 0);
+                    let Rlist = bits(0, 8);
 
                     if bit(11) { // L
                         for i in 0..8 { // POP { Rlist }
@@ -611,7 +611,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                         }
                     }
                 } else { // Add offset to stack pointer
-                    let SWord = bits(7, 0);
+                    let SWord = bits(0, 7);
 
                     let offset = if bit(7) { -SWord } else { SWord }; // S? -word : word
                     let value = cpu.reg(SP) + offset;
@@ -625,15 +625,15 @@ pub fn exec(cpu: &mut Cpu) -> bool {
             if !bit(12) { // Multiple load/store
 
                 let L = bit(11);
-                let Rb = bits(3, 8);
-                let Rlist = bits(8, 0);
+                let Rb = bits(8, 3);
+                let Rlist = bits(0, 8);
 
                 TODO();
 
                 cpu.next_pc();
             } else { // Conditional branch or Software interupt
-                let Cond = bits(4, 8);
-                let Soffset = bits(8, 0) as i8;
+                let Cond = bits(8, 4);
+                let Soffset = bits(0, 8) as i8;
 
                 let jump = match Cond {
                     0 => { // BEQ label
@@ -697,7 +697,7 @@ pub fn exec(cpu: &mut Cpu) -> bool {
         }
         0b111 => {
             if bit(12) { // Long branch with link
-                let Offset = bits(11, 0);
+                let Offset = bits(0, 11);
 
                 if !bit(11) { // !H
                     let lr = cpu.reg(PC) + (Offset << 12);
@@ -716,11 +716,11 @@ pub fn exec(cpu: &mut Cpu) -> bool {
                     cpu.set_reg(LR, pc);
                 }
             } else { // Unconditional branch
-                let Offset = bits(11, 0);
+                let Offset = bits(0, 11);
 
                 let value = (
                     (Offset as i32) << 1
-                    | (if bit(10) { !((1 << 11) - 1) } else { 0 })
+                        | (if bit(10) { !((1 << 11) - 1) } else { 0 })
                 ) + 4;
 
                 cpu.set_reg(PC, value);
