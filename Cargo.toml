@@ -1,6 +1,8 @@
 [package]
 name = "thumb"
 version = "0.1.0"
-authors = ["Hyeonu Park <nemo1275@gmail.com>"]
+authors = ["Hyeonu Park <nemo1275@gmail.com>",
+           "EcmaXp <ecmaxp@ecmaxp.pe.kr>"]
 
 [dependencies]
+byteorder = "1.2"

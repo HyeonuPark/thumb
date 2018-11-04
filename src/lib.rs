@@ -1,7 +1,8 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+//! Thumb CPU Emulator.
+
+extern crate byteorder;
+
+pub mod cpu;
+pub mod instr;
+
+pub use crate::cpu::Cpu;
