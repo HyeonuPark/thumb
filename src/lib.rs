@@ -1,3 +1,4 @@
+#![feature(crate_in_paths)]
 //! Thumb CPU Emulator.
 
 extern crate byteorder;
